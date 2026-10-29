@@ -25,7 +25,7 @@
 ## 快速开始
 
 ```sh
-git clone https://github.com/wangbinyq/pi-pocket-ntfy.git
+git clone https://github.com/OWNER/pi-pocket-ntfy.git
 cd pi-pocket-ntfy
 cp .env.example .env
 chmod 600 .env
