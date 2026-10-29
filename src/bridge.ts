@@ -193,7 +193,7 @@ export class Bridge {
         await this.#reply(failed("压缩", error));
         return;
       }
-      await this.#reply("PiP 上下文压缩完成。");
+      await this.#reply("PiP 上下文压缩已开始，摘要任务在后台进行。");
       return;
     }
     if (Array.from(command.argument).length > 20_000) {
@@ -207,11 +207,7 @@ export class Bridge {
       await this.#reply(failed("重置", error));
       return;
     }
-    await this.#reply(
-      command.argument
-        ? "PiP 上下文已重置，历史保留，会话 ID 不变；已附带交接说明。"
-        : "PiP 上下文已重置，历史保留，会话 ID 不变。",
-    );
+    await this.#reply("PiP 上下文已重置。");
   }
 
   async #receiving(): Promise<void> {
