@@ -101,7 +101,16 @@ NTFY_TOKEN=tk_xxxxxxxxxxxxxxxx
 ln -sf "$PWD/bin/notify" ~/.local/bin/notify
 ```
 
-要让所有 Pi 会话默认使用它，在 `~/.pi/agent/AGENTS.md` 里写一条规则，指向 `notify`。
+## Skill
+
+`skills/ntfy/SKILL.md` 让 agent 在合适的时机自己想起这条通道（任务结束、构建失败、定时任务需要人看）。装法是文件级软链，仓库是唯一来源：
+
+```sh
+mkdir -p ~/.agents/skills/ntfy
+ln -sf "$PWD/skills/ntfy/SKILL.md" ~/.agents/skills/ntfy/SKILL.md
+```
+
+新会话启动时 Pi 会扫描 `~/.agents/skills/`，把每个 skill 的名称和描述放进系统提示，命中时才加载正文。它不改 AGENTS.md，也不改变未命中时的行为。
 
 ## 行为
 
