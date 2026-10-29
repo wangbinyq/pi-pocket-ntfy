@@ -116,6 +116,14 @@ export class Pocket {
     return body as PocketRunning[];
   }
 
+  async compact(id: number, instructions?: string): Promise<void> {
+    await this.#json(`c/${id}/compact`, instructions ? { instructions } : {});
+  }
+
+  async reset(id: number, note?: string): Promise<void> {
+    await this.#json(`c/${id}/reset`, note ? { note } : {});
+  }
+
   async submit(
     id: number,
     text: string,

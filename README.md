@@ -112,6 +112,23 @@ ln -sf "$PWD/skills/ntfy/SKILL.md" ~/.agents/skills/ntfy/SKILL.md
 
 新会话启动时 Pi 会扫描 `~/.agents/skills/`，把每个 skill 的名称和描述放进系统提示，命中时才加载正文。它不改 AGENTS.md，也不改变未命中时的行为。
 
+## 命令
+
+整条消息完全匹配才当命令，其余文字原样提交给 PiP。
+
+| 命令 | 作用 |
+| --- | --- |
+| `/compact [说明]` | 立即压缩 PiP 上下文，最多 8000 字说明 |
+| `/reset [交接说明]` | 清空上下文，历史保留、会话 ID 不变，最多 20000 字交接 |
+| `/help` | 列出命令 |
+
+两个命令都直接调 Pocket 的 `POST /api/c/<id>/compact` 和 `POST /api/c/<id>/reset`。失败时分两种回执：
+
+- HTTP 4xx：Pocket 明确拒绝，没有执行。
+- 其他错误：请求已发出但结果不确定，**不自动重试** —— 重复 `/reset` 会二次清空上下文，重复 `/compact` 会二次计费。
+
+普通文字的失败相反：游标回退到上一条，重连后重放，靠 `requestId` 去重，不会重复提交。
+
 ## 行为
 
 - **输入**：主题里的普通消息原文提交给 PiP，`requestId` 用 ntfy 消息 ID，所以重放是幂等的。

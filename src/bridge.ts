@@ -2,11 +2,39 @@ import { basename } from "node:path";
 import type { Config } from "./config.ts";
 import { splitText } from "./format.ts";
 import { Ntfy, type NtfyMessage } from "./ntfy.ts";
-import { Pocket, finalText, type PocketAttachment, type PocketTarget } from "./pocket.ts";
+import { Pocket, finalText, HttpError, type PocketAttachment, type PocketTarget } from "./pocket.ts";
 import { Store } from "./store.ts";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const MAX_ATTACHMENT = 20 * 1024 * 1024;
+
+const HELP = `PiP ntfy 桥接
+/compact [说明] — 立即压缩 PiP 上下文
+/reset [交接说明] — 清空上下文，历史保留，会话 ID 不变
+/help — 这条帮助
+
+其他文字直接提交给 PiP。命令必须整条消息完全匹配，前后不能有多余内容。`;
+
+interface Command {
+  name: "compact" | "reset" | "help";
+  argument: string;
+}
+
+function parseCommand(text: string): Command | undefined {
+  const match = /^\/(compact|reset|help)(?:[ \t]+([\s\S]*))?$/.exec(text);
+  if (!match) return undefined;
+  return {
+    name: match[1] as Command["name"],
+    argument: (match[2] || "").trim(),
+  };
+}
+
+function failed(action: string, error: unknown): string {
+  const status = error instanceof HttpError ? error.status : undefined;
+  if (status !== undefined && status >= 400 && status < 500)
+    return `${action}请求被 Pocket 拒绝（HTTP ${status}），没有执行。请打开 Pocket 检查权限和当前状态。`;
+  return `${action}请求已发出，但结果不确定，没有自动重试。请打开 Pocket 检查后，再决定是否重发。`;
+}
 
 function log(message: string): void {
   console.log(`${new Date().toISOString()} ${message}`);
@@ -108,28 +136,82 @@ export class Bridge {
     if (message.event !== "message") return;
     if (!message.id || this.store.sent(message.id)) return;
     if (message.id === this.store.state.lastMessageId) return;
+    const previous = this.store.state.lastMessageId;
     this.store.seeMessage(message.id);
     const text = (message.message || "").trim();
-    const attachments: PocketAttachment[] = [];
-    if (message.attachment) {
-      const size = message.attachment.size ?? 0;
-      if (size > MAX_ATTACHMENT) throw new Error("attachment is larger than 20 MiB");
-      const name = safeName(message.attachment.name || "attachment.bin");
-      const bytes = await this.ntfy.download(message.attachment.url);
-      if (bytes.length > MAX_ATTACHMENT) throw new Error("attachment is larger than 20 MiB");
-      attachments.push(
-        await this.pocket.upload(this.target.id, bytes, name, mimeOf(name, message.attachment.type)),
-      );
+    const command = parseCommand(text);
+    if (command) {
+      await this.#command(command);
+      return;
     }
-    if (!text && attachments.length === 0) return;
-    await this.pocket.submit(
-      this.target.id,
-      text || "请看附件。",
-      `ntfy-${message.id}`,
-      "followUp",
-      attachments,
+    try {
+      const attachments: PocketAttachment[] = [];
+      if (message.attachment) {
+        const size = message.attachment.size ?? 0;
+        if (size > MAX_ATTACHMENT) throw new Error("attachment is larger than 20 MiB");
+        const name = safeName(message.attachment.name || "attachment.bin");
+        const bytes = await this.ntfy.download(message.attachment.url);
+        if (bytes.length > MAX_ATTACHMENT) throw new Error("attachment is larger than 20 MiB");
+        attachments.push(
+          await this.pocket.upload(this.target.id, bytes, name, mimeOf(name, message.attachment.type)),
+        );
+      }
+      if (!text && attachments.length === 0) return;
+      await this.pocket.submit(
+        this.target.id,
+        text || "请看附件。",
+        `ntfy-${message.id}`,
+        "followUp",
+        attachments,
+      );
+      log(`submitted ntfy message ${message.id} (text=${text.length} chars, attachments=${attachments.length})`);
+    } catch (error) {
+      this.store.seeMessage(previous);
+      throw error;
+    }
+  }
+
+  async #reply(text: string): Promise<void> {
+    const id = await this.ntfy.publish(text);
+    this.store.markSent(id);
+  }
+
+  async #command(command: Command): Promise<void> {
+    if (command.name === "help") {
+      await this.#reply(HELP);
+      return;
+    }
+    if (command.name === "compact") {
+      if (Array.from(command.argument).length > 8000) {
+        await this.#reply("说明太长（上限 8000 字），没有执行。");
+        return;
+      }
+      try {
+        await this.pocket.compact(this.target.id, command.argument || undefined);
+      } catch (error) {
+        log(`/compact failed: ${(error as Error).message}`);
+        await this.#reply(failed("压缩", error));
+        return;
+      }
+      await this.#reply("PiP 上下文压缩完成。");
+      return;
+    }
+    if (Array.from(command.argument).length > 20_000) {
+      await this.#reply("交接说明太长（上限 20000 字），没有执行。");
+      return;
+    }
+    try {
+      await this.pocket.reset(this.target.id, command.argument || undefined);
+    } catch (error) {
+      log(`/reset failed: ${(error as Error).message}`);
+      await this.#reply(failed("重置", error));
+      return;
+    }
+    await this.#reply(
+      command.argument
+        ? "PiP 上下文已重置，历史保留，会话 ID 不变；已附带交接说明。"
+        : "PiP 上下文已重置，历史保留，会话 ID 不变。",
     );
-    log(`submitted ntfy message ${message.id} (text=${text.length} chars, attachments=${attachments.length})`);
   }
 
   async #receiving(): Promise<void> {
