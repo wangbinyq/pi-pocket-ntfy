@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | 传输 | 微信 iLink（扫码登录） | ntfy 主题（HTTP + 访问令牌） |
 | 会话 | 多会话路由、`/sessions` `/resume` `/new` | 只有 PiP，固定会话 |
-| 控制命令 | `/stop` `/model` `/busy` `/send` | 无 |
+| 控制命令 | `/stop` `/model` `/busy` `/send` | `/compact` `/reset` `/help` |
 | 输入中提示 | 有 | 无（ntfy 没有这个能力） |
 | 依赖 | proper-lockfile、qrcode、zod | 无运行时依赖 |
 
