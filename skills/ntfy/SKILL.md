@@ -11,7 +11,7 @@ The owner reads ntfy on a phone. One command sends a notification.
 ## Send a notification
 
 ```bash
-notify -t "部署完成" "main 分支 已上线，耗时 3m12s"
+notify -t "构建完成" "main 分支已部署，耗时 3m12s"
 ```
 
 - `-t` title, `-p` priority (1 to 5, or `min` `low` `default` `high` `urgent`), `-g` tags (comma separated, emoji shortcodes such as `white_check_mark`).

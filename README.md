@@ -82,7 +82,7 @@ WantedBy=default.target
 `bin/notify` 往 `pip-notify` 推一条消息，任何会话都能用：
 
 ```sh
-notify -t "部署完成" "main 分支 已上线，耗时 3m12s"
+notify -t "构建完成" "main 分支已部署，耗时 3m12s"
 notify "只有正文"
 notify "标题" "正文"
 ```
