@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CONFIG=${NOTIFY_ENV:-$HOME/.config/pi-pocket-ntfy/notify.env}
+if [ -r "$CONFIG" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$CONFIG"
+  set +a
+fi
+
+: "${NTFY_URL:?ntfy URL is not configured (see $CONFIG)}"
+: "${NTFY_TOKEN:?ntfy access token is not configured (see $CONFIG)}"
+TOPIC=${NTFY_TOPIC:-pip-notify}
+
+title=""
+priority=""
+tags=""
+while getopts ":t:p:g:h" option; do
+  case "$option" in
+    t) title=$OPTARG ;;
+    p) priority=$OPTARG ;;
+    g) tags=$OPTARG ;;
+    h)
+      cat <<'USAGE'
+usage: notify [-t title] [-p priority] [-g tags] body...
+       notify title body
+
+Publishes one message to the ntfy topic in ~/.config/pi-pocket-ntfy/notify.env
+(default: pip-notify). Reads NTFY_URL, NTFY_TOKEN, NTFY_TOPIC from that file or
+from the environment.
+USAGE
+      exit 0
+      ;;
+    :)
+      echo "notify: -$OPTARG needs a value" >&2
+      exit 2
+      ;;
+    \?)
+      echo "notify: unknown option -$OPTARG" >&2
+      exit 2
+      ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+case $# in
+  0)
+    echo "notify: no message body" >&2
+    exit 2
+    ;;
+  1) body=$1 ;;
+  *)
+    if [ -z "$title" ]; then
+      title=$1
+      shift
+    fi
+    body=$*
+    ;;
+esac
+
+if [ -z "$body" ]; then
+  echo "notify: no message body" >&2
+  exit 2
+fi
+
+headers=(
+  -H "Authorization: Bearer $NTFY_TOKEN"
+  -H "Content-Type: text/plain; charset=utf-8"
+)
+[ -n "$title" ] && headers+=(-H "X-Title: $title")
+[ -n "$priority" ] && headers+=(-H "X-Priority: $priority")
+[ -n "$tags" ] && headers+=(-H "X-Tags: $tags")
+
+curl --fail-with-body --silent --show-error \
+  --retry 3 --retry-delay 2 --max-time 20 \
+  "${headers[@]}" \
+  --data-binary "$body" \
+  "${NTFY_URL%/}/$TOPIC" >/dev/null
