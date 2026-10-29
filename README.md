@@ -68,6 +68,41 @@ PrivateTmp=true
 WantedBy=default.target
 ```
 
+## 两个主题，用途不同
+
+| 主题 | 方向 | 谁用 |
+| --- | --- | --- |
+| `pip` | 双向 | 桥接和 PiP 之间的对话 |
+| `pip-notify` | 单向，只推给你 | 任何会话/脚本给主人发通知 |
+
+往 `pip` 里发消息等于给 PiP 下指令；要提醒主人不要发到 `pip`。
+
+## notify 命令
+
+`bin/notify` 往 `pip-notify` 推一条消息，任何会话都能用：
+
+```sh
+notify -t "部署完成" "main 分支 已上线，耗时 3m12s"
+notify "只有正文"
+notify "标题" "正文"
+```
+
+配置从 `~/.config/pi-pocket-ntfy/notify.env` 读，权限 600：
+
+```dotenv
+NTFY_URL=https://ntfy.example.com
+NTFY_TOPIC=pip-notify
+NTFY_TOKEN=tk_xxxxxxxxxxxxxxxx
+```
+
+也可以用同名的环境变量覆盖。装法：
+
+```sh
+ln -sf "$PWD/bin/notify" ~/.local/bin/notify
+```
+
+要让所有 Pi 会话默认使用它，在 `~/.pi/agent/AGENTS.md` 里写一条规则，指向 `notify`。
+
 ## 行为
 
 - **输入**：主题里的普通消息原文提交给 PiP，`requestId` 用 ntfy 消息 ID，所以重放是幂等的。
